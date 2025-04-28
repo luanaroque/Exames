@@ -8,7 +8,7 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-color: #e6f0ff;
+        background-color: #6EA1C7;
     }
     input, textarea {
         background-color: #ffffff !important;
@@ -23,6 +23,7 @@ st.markdown(
         background-color: #4d79ff;
         color: white;
         font-weight: bold;
+        border-radius: 8px;
     }
     </style>
     """,
@@ -37,7 +38,6 @@ abreviacoes = {
     "Leucócitos": "Leuco",
     "Plaquetas": "Plaq",
     "Glicose": "Gj",
-    "Glicemia de jejum": "Gj",
     "Creatinina": "Cr",
     "Ureia": "U",
     "Ácido úrico": "Ácido úrico",
@@ -51,7 +51,6 @@ abreviacoes = {
     "Ácido fólico": "Ácido fólico",
     "Vitamina B12": "Vit B12",
     "Vitamina D": "Vit D",
-    "25-hidroxivitamina D": "Vit D",
     "1,25-dihidroxivitamina D": "1,25 Vit D",
     "Colesterol total": "CT",
     "HDL colesterol": "HDL",
@@ -59,11 +58,8 @@ abreviacoes = {
     "VLDL colesterol": "VLDL",
     "Não-HDL colesterol": "não-HDL",
     "Triglicerídeos": "Tg",
-    "Triglicérides": "Tg",
     "TGO": "TGO",
-    "AST": "TGO",
     "TGP": "TGP",
-    "ALT": "TGP",
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
     "TSH": "TSH",
@@ -78,7 +74,6 @@ abreviacoes = {
     "DHEA-S": "DHEA-S",
     "HCG": "HCG",
     "Paratormônio": "PTH",
-    "Hormônio paratireoideo": "PTH",
     "17-alfa-hidroxiprogesterona": "17-OH-Pg",
     "Proteína C reativa": "PCR",
     "HIV 1/2": "HIV",
@@ -103,6 +98,9 @@ faixas_padroes = {
     "Gj": (60, 110),
     "Cr": (0.4, 2),
 }
+
+
+
 
 def extrair_texto(pdf_file):
     texto = ""
@@ -163,6 +161,10 @@ def encontrar_lab_data(texto):
     if datas:
         data = datas[0]
     return lab, data
+
+
+
+
 
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
