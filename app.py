@@ -1,68 +1,62 @@
-
 import streamlit as st
 import pdfplumber
 import re
 
-# Função para extrair resultados
-def extrair_resultados(texto):
-    padrao = r"(\b[A-Za-zÀ-ÖØ-öø-ÿ0-9/().% +-]+\b)\s*([<>]?-?\d+[,.]?\d*)"
-    matches = re.findall(padrao, texto)
-    resultados = []
-    for match in matches:
-        exame = match[0].strip()
-        valor = match[1].strip()
-        if valor != "":
-            resultados.append(f"{exame} {valor}")
-    return " | ".join(resultados)
+st.set_page_config(page_title="Transcritor de exames", page_icon=":clipboard:", layout="centered")
 
-# Função para extrair a data de coleta
-def extrair_data(texto):
-    datas = re.findall(r"(\d{2}/\d{2}/\d{4})", texto)
-    for data in datas:
-        if not re.search(r"nascimento", texto.lower()):
-            return data
-    return ""
-
-# Layout da página
-st.set_page_config(page_title="Transcritor de exames", page_icon=":memo:", layout="centered")
 st.markdown(
-    '''
+    """
     <style>
-        body {
-            background: linear-gradient(to bottom, #E6E6FA, #FFFFFF);
-        }
+    .stApp {
+        background: linear-gradient(to bottom, #E6E6FA, #FFFFFF);
+    }
     </style>
-    ''',
+    """,
     unsafe_allow_html=True
 )
 
 st.title("Transcritor de exames")
 
-st.header("Informações do Exame")
-
 uploaded_file = st.file_uploader("Escolha o arquivo PDF do exame", type="pdf")
-
-nome_laboratorio = st.text_input("Nome do laboratório:")
-data_coleta = st.text_input("Data da coleta (dd/mm/aaaa):")
-
-resumo = ""
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
-        texto_pdf = ""
+        text = ""
         for page in pdf.pages:
-            texto_pdf += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
 
-    if not data_coleta:
-        data_coleta = extrair_data(texto_pdf)
+    # Tentativa de extrair a data de coleta
+    datas = re.findall(r"\d{2}/\d{2}/\d{4}", text)
+    data_coleta = datas[-1] if datas else ""
 
-    resultados = extrair_resultados(texto_pdf)
+    # Tentativa de extrair o nome do laboratório
+    laboratorio = ""
+    if "Einstein" in text:
+        laboratorio = "Einstein"
+    elif "Fleury" in text:
+        laboratorio = "Fleury"
+    elif "Delboni" in text:
+        laboratorio = "Delboni"
+
+    # Extrair exames com valores numéricos
+    linhas = text.split("\n")
+    resultados = []
+    for linha in linhas:
+        matches = re.findall(r"([A-Za-zçÇãõÕéÉêÊáÁíÍóÓúÚâÂôÔûÛ\-\s]+)\s*(-?\d+[.,]?\d*)", linha)
+        for exame, valor in matches:
+            exame = exame.strip()
+            valor = valor.replace(",", ".").strip()
+            if exame and valor:
+                resultados.append(f"{exame} {valor}")
 
     if resultados:
-        resumo = f"{nome_laboratorio.upper()}, {data_coleta}: {resultados}"
+        resumo = f"{laboratorio}, {data_coleta}: " + " | ".join(resultados)
+    else:
+        resumo = "Não foi possível extrair resultados numéricos."
 
-st.header("Linha pronta para o prontuário:")
-st.text_area("Resumo:", value=resumo, height=300)
+    st.subheader("Linha pronta para o prontuário:")
+    st.code(resumo, language="")
 
-if resumo:
-    st.button("Copiar Resumo", on_click=lambda: st.session_state.update({"resumo_copiado": True}))
+    st.button("Copiar Resumo", on_click=lambda: st.toast("Copie manualmente o texto acima."))
