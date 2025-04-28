@@ -5,23 +5,41 @@ import re
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.title("Transcritor de exames")
 
-# Lista de exames e suas abreviações
+# Lista de abreviações dos exames
 abreviacoes = {
+    # Hemograma (só Hb, Leuco e Plaq)
     "Hemoglobina": "Hb",
     "Leucócitos": "Leuco",
     "Plaquetas": "Plaq",
-    "Creatinina": "Cr",
-    "Ureia": "U",
+
+    # Bioquímica
     "Glicose": "Gj",
     "Glicemia de jejum": "Gj",
-    "Hemoglobina glicada": "HbA1c",
+    "Creatinina": "Cr",
+    "Ureia": "U",
+    "Ácido úrico": "Ácido úrico",
+    "Sódio": "Na",
+    "Potássio": "K",
+    "Cálcio": "Ca",
+    "Cálcio ionizado": "Ca ionizado",
+    "Ferro": "Ferro",
+    "Zinco": "Zinco",
+    "Ácido fólico": "Ácido fólico",
+    "Vitamina B12": "Vit B12",
+    "Vitamina D": "Vit D",
+    "1,25 dihidroxivitamina D": "1,25 Vit D",
+    "25 hidroxivitamina D": "Vit D",
+
+    # Perfil lipídico
     "Colesterol total": "CT",
     "HDL colesterol": "HDL",
     "LDL colesterol": "LDL",
     "VLDL colesterol": "VLDL",
+    "Não-HDL colesterol": "não-HDL",
     "Triglicerídeos": "Tg",
     "Triglicérides": "Tg",
-    "Não-HDL colesterol": "não-HDL",
+
+    # Hepáticas
     "TGO": "TGO",
     "AST": "TGO",
     "TGP": "TGP",
@@ -29,24 +47,44 @@ abreviacoes = {
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
     "Gama glutamil transferase": "GGT",
-    "Bilirrubina total": "BT",
-    "Bilirrubina direta": "BD",
-    "Bilirrubina indireta": "BI",
-    "PCR": "PCR",
-    "Proteína C reativa": "PCR",
-    "Ferro": "Ferro",
-    "Saturação da transferrina": "Sat Transferrina",
+
+    # Endócrinos
     "TSH": "TSH",
     "T4 livre": "T4L",
-    "Tiroxina livre": "T4L",
+    "T4": "T4",
     "T3": "T3",
-    "Vitamina D": "Vit D",
-    "25-hidroxivitamina D": "Vit D",
-    "Vitamina B12": "Vit B12",
+    "FSH": "FSH",
+    "LH": "LH",
+    "Estradiol": "E2",
+    "Progesterona": "Prog",
+    "Testosterona total": "Testo",
+    "SHBG": "SHBG",
+    "DHEA-S": "DHEA-S",
     "HCG": "HCG",
+    "Paratormônio": "PTH",
+    "Hormônio paratireoideo": "PTH",
+    "17-alfa-hidroxiprogesterona": "17-OH-Pg",
+    
+    # Marcadores inflamatórios
+    "Proteína C reativa": "PCR",
+    "PCR": "PCR",
+    "VHS": "VHS",
+    
+    # Sorologias
+    "HIV 1/2": "HIV",
+    "Anti-HCV": "Anti-HCV",
+    "Anti-HBs": "Anti-HBs",
+    "Antígeno HBs": "AgHBs",
+    "Antígeno HBe": "AgHBe",
+    "Anti-HBe": "Anti-HBe",
+    "Anti-HBc IgG": "Anti-HBc IgG",
+    "Anti-HBc IgM": "Anti-HBc IgM",
+    "Sífilis": "Sífilis",
+    "VDRL": "VDRL",
+    "FTA-ABS": "FTA-ABS",
 }
 
-# Exames do hemograma que queremos manter
+# Apenas Hb, Leuco e Plaq do hemograma
 exames_hemograma = {"Hb", "Leuco", "Plaq"}
 
 def extrair_texto(pdf_file):
@@ -61,8 +99,7 @@ def limpar_texto(texto):
     texto = re.sub(r'CRM.*', '', texto)
     texto = re.sub(r'ANVISA.*', '', texto)
     texto = re.sub(r'Tel.*', '', texto)
-    texto = re.sub(r'Canal Médico.*', '', texto)
-    texto = re.sub(r'Página:.*', '', texto)
+    texto = re.sub(r'Página.*', '', texto)
     return texto
 
 def encontrar_exames(texto):
@@ -71,14 +108,12 @@ def encontrar_exames(texto):
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
             if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
-                # Procurar o valor no mesmo lugar ou na linha de baixo
                 match = re.search(r'([-+]?\d+[\d\.,]*)', linha)
                 if not match and idx + 1 < len(linhas):
                     match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 1])
                 if match:
                     valor = match.group(1).replace(",", ".")
-                    # Somente pega Hb, Leuco, Plaq se for Hemograma
-                    if abrev in exames_hemograma or abrev not in {"Hb", "Ht", "Eri", "Neutro", "Eos", "Baso", "Linf", "Mono", "RDW", "VCM", "HCM", "CHCM"}:
+                    if abrev in exames_hemograma or abrev not in {"Eri", "Ht", "RDW", "VCM", "HCM", "CHCM", "Neutro", "Eos", "Baso", "Linf", "Mono"}:
                         resultados[abrev] = valor
     return resultados
 
@@ -89,6 +124,8 @@ def encontrar_lab_data(texto):
         lab = "Albert Einstein"
     elif "Fleury" in texto or "Edgar Rizzatti" in texto:
         lab = "Fleury"
+    elif "Hospital do Coração" in texto or "HCor" in texto:
+        lab = "HCor"
     datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto)
     if datas:
         data = datas[0]
@@ -113,11 +150,16 @@ if uploaded_file:
     if exames:
         partes = []
         grupo = []
-        ordem = ["Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg", "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "PCR", "Ferro", "Sat Transferrina", "HCG"]
+        ordem = ["Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
+                 "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T4", "T3",
+                 "FSH", "LH", "E2", "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg",
+                 "Ácido úrico", "Na", "K", "Ca", "Ca ionizado", "PCR", "HIV", "Anti-HCV", "Anti-HBs",
+                 "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM", "Sífilis", "VDRL", "FTA-ABS", "HCG", "Zinco", "Ácido fólico", "Ferro"]
+
         for exame in ordem:
             if exame in exames:
                 grupo.append(f"{exame} {exames[exame]}")
-                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina"]:
+                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina", "HIV", "Anti-HCV", "Ferro"]:
                     partes.append(" ".join(grupo))
                     grupo = []
         if grupo:
@@ -131,4 +173,4 @@ if uploaded_file:
 
         st.caption("Selecione e copie o texto acima manualmente se necessário.")
     else:
-        st.warning("Nenhum exame conhecido encontrado no documento.")
+        st.warning("Nenhum exame encontrado no documento.")
