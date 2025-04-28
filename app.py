@@ -33,14 +33,16 @@ st.markdown(
 
 st.title("Transcritor de exames")
 
+# Abreviações conhecidas
 abreviacoes = {
     "Hemoglobina": "Hb", "Hematócrito": "Ht", "Leucócitos": "Leuco", "Plaquetas": "Plaq",
     "Creatinina": "Cr", "Ureia": "U", "Glicose": "Gj", "Hemoglobina glicada": "HbA1c",
     "Colesterol total": "CT", "HDL colesterol": "HDL", "LDL colesterol": "LDL",
     "VLDL": "VLDL", "Triglicerídeos": "Tg", "Sódio": "Na", "Potássio": "K",
-    "Cálcio": "Ca", "Cálcio ionizado": "Ca ionizado", "Magnésio": "Mg", "Ácido Úrico": "AcU",
-    "Ferro": "Ferro", "Ferritina": "Ferritina", "Vitamina D": "Vit D", "Vitamina B12": "Vit B12",
-    "Proteína C reativa": "PCR", "Fosfatase alcalina": "FAL", "Gama GT": "GGT",
+    "Cálcio": "Ca", "Cálcio ionizado": "Ca ionizado", "Magnésio": "Mg",
+    "Ácido Úrico": "AcU", "Ferro": "Ferro", "Ferritina": "Ferritina",
+    "Vitamina D": "Vit D", "Vitamina B12": "Vit B12", "Proteína C reativa": "PCR",
+    "Fosfatase alcalina": "FAL", "Gama GT": "GGT", "TGO": "TGO", "TGP": "TGP",
     "TSH": "TSH", "T4 livre": "T4L", "T3": "T3", "FSH": "FSH", "LH": "LH",
     "Estradiol": "E2", "Progesterona": "Prog", "Testosterona total": "Testo",
     "Paratormônio": "PTH", "HCG": "HCG", "HIV 1/2": "HIV", "Anti-HCV": "Anti-HCV",
@@ -63,27 +65,37 @@ def limpar_texto(texto):
     texto = re.sub(r'Página.*', '', texto)
     return texto
 
-def encontrar_valor(trecho):
+def encontrar_valor(trecho, exame_nome):
     if re.search(r"não reagente|indetectável|não detectado", trecho, re.IGNORECASE):
         return "NR"
     numeros = re.findall(r'[-+]?\d[\d.,]*', trecho)
     if numeros:
-        valor = numeros[0].replace(",", ".")
-        return valor
+        numeros = [n.replace(",", ".") for n in numeros]
+        # Correção específica para Ferro
+        if exame_nome.lower() == "ferro":
+            return numeros[0] if len(numeros) >= 1 else None
+        return numeros[0]
     return None
 
 def encontrar_exames(texto):
     resultados = {}
     linhas = texto.split('\n')
     for idx, linha in enumerate(linhas):
+        trecho = linha
+        if idx + 1 < len(linhas):
+            trecho += ' ' + linhas[idx + 1]
         for nome, abrev in abreviacoes.items():
             if nome.lower() in linha.lower():
-                trecho = linha
-                if idx + 1 < len(linhas):
-                    trecho += ' ' + linhas[idx + 1]
-                valor = encontrar_valor(trecho)
+                valor = encontrar_valor(trecho, nome)
                 if valor:
                     resultados[abrev] = valor
+        # Também pega qualquer exame diferente
+        if ":" in linha and any(char.isdigit() for char in linha):
+            exame_nome = linha.split(":")[0].strip()
+            if exame_nome not in resultados.values() and exame_nome not in abreviacoes:
+                valor = encontrar_valor(trecho, exame_nome)
+                if valor:
+                    resultados[exame_nome] = valor
     return resultados
 
 def encontrar_lab_data(texto):
@@ -115,25 +127,13 @@ if uploaded_file:
         data_exame = st.text_input("Data da coleta", data if data else "")
 
     if exames:
-        ordem = [
-            "Hb", "Ht", "Leuco", "Plaq", "Cr", "U", "Gj", "HbA1c",
-            "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg", "TGO", "TGP",
-            "FAL", "GGT", "Vit D", "Vit B12", "PCR", "Ferro", "Ferritina",
-            "Sat Transferrina", "TSH", "T4L", "T3", "FSH", "LH", "E2", "Prog", "Testo",
-            "PTH", "HCG", "HIV", "Anti-HCV", "Sífilis", "AgHBs", "Anti-HBs",
-            "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM"
-        ]
-        resumo_exames = []
-        for exame in ordem:
-            if exame in exames:
-                resumo_exames.append(f"{exame} {exames[exame]}")
-
+        resumo_exames = [f"{exame} {valor}" for exame, valor in exames.items()]
         resumo_final = f"{laboratorio}, {data_exame}: " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
         st.text_area("Resumo:", resumo_final, height=300)
 
-        # Botão Copiar com JavaScript
+        # Botão Copiar via JavaScript
         components.html(f"""
             <textarea id="to_copy" style="opacity:0;">{resumo_final}</textarea>
             <button onclick="copyToClipboard()">Copiar resumo</button>
@@ -146,6 +146,5 @@ if uploaded_file:
             }}
             </script>
         """, height=100)
-
     else:
         st.warning("Nenhum exame encontrado no documento.")
