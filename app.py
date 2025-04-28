@@ -1,14 +1,9 @@
-
 import streamlit as st
 import fitz
 import re
-import logging
+import streamlit.components.v1 as components
 from typing import Dict, List
 from io import BytesIO
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def extract_text_from_pdf(pdf_file: BytesIO) -> str:
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -19,19 +14,13 @@ def extract_text_from_pdf(pdf_file: BytesIO) -> str:
 
 def parse_exam_data(text: str) -> List[Dict[str, str]]:
     exams = []
-    
-    # Patterns for different exam formats
+
+    # Corrigi aqui as regex: tudo dentro de uma lista normal
     patterns = [
-        r'([^:
-]+):\s*([^
-]+)',
-        r'([^=
-]+)=\s*([^
-]+)',
-        r'([^:
-]+)\s*(?::|=)\s*([0-9,.]+(?:\s*[a-zA-Z/%]+)?)',
-        r'([^:
-]+):\s*((?:Reagente|Não Reagente|Positivo|Negativo))'
+        r'([^:\n]+):\s*([^:\n]+)',
+        r'([^=\n]+)=\s*([^=\n]+)',
+        r'([^:\n]+)\s*(?::|=)\s*([0-9,.]+(?:\s*[a-zA-Z/%]+)?)',
+        r'([^:\n]+):\s*((?:Reagente|Não Reagente|Positivo|Negativo))'
     ]
     
     for pattern in patterns:
@@ -39,11 +28,8 @@ def parse_exam_data(text: str) -> List[Dict[str, str]]:
         for match in matches:
             name = match.group(1).strip()
             result = match.group(2).strip()
-            
             if len(name) < 2 or len(result) < 1:
                 continue
-                
-            logger.info(f"Found exam: {name} = {result}")
             exams.append({
                 'name': name,
                 'result': result
@@ -52,8 +38,9 @@ def parse_exam_data(text: str) -> List[Dict[str, str]]:
     return exams
 
 def main():
-    st.title("Analisador de Exames Médicos")
-    
+    st.set_page_config(page_title="Transcritor de exames", layout="wide")
+    st.title("Transcritor de Exames Médicos")
+
     uploaded_file = st.file_uploader("Escolha um arquivo PDF", type="pdf")
     
     if uploaded_file:
@@ -61,10 +48,29 @@ def main():
             text = extract_text_from_pdf(uploaded_file)
             exams = parse_exam_data(text)
             
-            st.subheader("Resultados Encontrados")
-            for exam in exams:
-                st.write(f"**{exam['name']}:** {exam['result']}")
-                
+            if exams:
+                # Cria o resumo em linha única
+                resumo = " | ".join([f"{exam['name']} {exam['result']}" for exam in exams])
+
+                st.subheader("Resumo gerado")
+                st.text_area("Resumo:", resumo, height=250)
+
+                # Botão copiar usando JavaScript
+                components.html(f"""
+                    <textarea id="to_copy" style="opacity:0;">{resumo}</textarea>
+                    <button onclick="copyToClipboard()">Copiar resumo</button>
+                    <script>
+                    function copyToClipboard() {{
+                        var copyText = document.getElementById("to_copy");
+                        copyText.select();
+                        document.execCommand("copy");
+                        alert("Resumo copiado para a área de transferência!");
+                    }}
+                    </script>
+                """, height=100)
+            else:
+                st.warning("Nenhum exame encontrado.")
+
         except Exception as e:
             st.error(f"Erro ao processar o arquivo: {str(e)}")
 
