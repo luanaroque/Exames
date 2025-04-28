@@ -2,22 +2,27 @@ import streamlit as st
 import fitz  # PyMuPDF
 import re
 
-# Estilo da página
+# Configurações de estilo
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.markdown(
     """
     <style>
     .stApp {
         background-color: #e6f0ff;
-        color: #333333;
     }
-    textarea {
-        font-size: 18px !important;
+    input, textarea {
+        background-color: #ffffff !important;
         color: #333333 !important;
+        font-size: 16px !important;
+    }
+    label {
+        color: #666666 !important;
+        font-weight: bold;
     }
     .stButton button {
         background-color: #4d79ff;
         color: white;
+        font-weight: bold;
     }
     </style>
     """,
@@ -26,7 +31,7 @@ st.markdown(
 
 st.title("Transcritor de exames")
 
-# Abreviações dos exames
+# Lista de abreviações
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Leucócitos": "Leuco",
@@ -42,7 +47,6 @@ abreviacoes = {
     "Cálcio ionizado": "Ca ionizado",
     "Ferro": "Ferro",
     "Saturação da transferrina": "Sat Transferrina",
-    "Índice de saturação da transferrina": "Sat Transferrina",
     "Zinco": "Zinco",
     "Ácido fólico": "Ácido fólico",
     "Vitamina B12": "Vit B12",
@@ -62,7 +66,6 @@ abreviacoes = {
     "ALT": "TGP",
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
-    "Gama glutamil transferase": "GGT",
     "TSH": "TSH",
     "T4 livre": "T4L",
     "T3": "T3",
@@ -93,6 +96,14 @@ abreviacoes = {
 
 exames_hemograma = {"Hb", "Leuco", "Plaq"}
 
+faixas_padroes = {
+    "Ferro": (30, 300),
+    "Sat Transferrina": (20, 60),
+    "PCR": (0, 10),
+    "Gj": (60, 110),
+    "Cr": (0.4, 2),
+}
+
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -108,6 +119,21 @@ def limpar_texto(texto):
     texto = re.sub(r'Página.*', '', texto)
     return texto
 
+def encontrar_valor_puro(trecho, exame):
+    if re.search(r"indetectável|não reagente|não detectado", trecho, re.IGNORECASE):
+        return "NR"
+    matches = re.findall(r'([-+]?\d+[.,]?\d*)', trecho)
+    numeros = [float(m.replace(",", ".")) for m in matches if '-' not in m]
+    if not numeros:
+        return None
+    if exame in faixas_padroes:
+        faixa = faixas_padroes[exame]
+        numeros_filtrados = [n for n in numeros if faixa[0] <= n <= faixa[1]]
+        if numeros_filtrados:
+            return str(int(numeros_filtrados[0]) if numeros_filtrados[0].is_integer() else numeros_filtrados[0])
+    maior = max(numeros)
+    return str(int(maior) if maior.is_integer() else maior)
+
 def encontrar_exames(texto):
     resultados = {}
     linhas = texto.split('\n')
@@ -119,17 +145,9 @@ def encontrar_exames(texto):
                     trecho += ' ' + linhas[idx + 1]
                 if idx + 2 < len(linhas):
                     trecho += ' ' + linhas[idx + 2]
-
-                if re.search(r"indetectável|não reagente|não detectado", trecho, re.IGNORECASE):
-                    resultados[abrev] = "NR"
-                else:
-                    matches = re.findall(r'([-+]?\d+[.,]?\d*)', trecho)
-                    numeros = [float(m.replace(",", ".")) for m in matches if '-' not in m and float(m.replace(",", ".")) > 0]
-                    if numeros:
-                        maior = max(numeros)
-                        if maior.is_integer():
-                            maior = int(maior)
-                        resultados[abrev] = str(maior)
+                valor = encontrar_valor_puro(trecho, abrev)
+                if valor:
+                    resultados[abrev] = valor
     return resultados
 
 def encontrar_lab_data(texto):
@@ -166,12 +184,10 @@ if uploaded_file:
         partes = []
         grupo = []
         ordem = [
-            "Hb", "Leuco", "Plaq",
-            "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12",
-            "TSH", "T4L", "T3", "FSH", "LH", "E2", "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg",
-            "Ácido úrico", "Na", "K", "Ca", "Ca ionizado",
-            "PCR", "Sat Transferrina", "Ferro",
+            "Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
+            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "FSH", "LH", "E2",
+            "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg", "Ácido úrico", "Na",
+            "K", "Ca", "Ca ionizado", "PCR", "Sat Transferrina", "Ferro",
             "HCG", "HIV", "Sífilis", "Anti-HCV", "Anti-HBs", "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM"
         ]
         for exame in ordem:
