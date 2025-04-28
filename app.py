@@ -89,8 +89,7 @@ abreviacoes = {
     "FTA-ABS": "FTA-ABS"
 }
 
-exames_hemograma = {"Hb", "Leuco", "Plaq"}
-
+# Faixas plausíveis
 faixas_padroes = {
     "Ferro": (30, 300),
     "Sat Transferrina": (20, 60),
@@ -99,7 +98,7 @@ faixas_padroes = {
     "Cr": (0.4, 2),
 }
 
-# Funções de extração
+# Funções auxiliares
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -127,6 +126,8 @@ def encontrar_valor_puro(trecho, exame):
         numeros_filtrados = [n for n in numeros if faixa[0] <= n <= faixa[1]]
         if numeros_filtrados:
             return str(int(numeros_filtrados[0]) if numeros_filtrados[0].is_integer() else numeros_filtrados[0])
+        else:
+            return None
     maior = max(numeros)
     return str(int(maior) if maior.is_integer() else maior)
 
@@ -162,7 +163,7 @@ def encontrar_lab_data(texto):
 
 
 
-# Upload do PDF e Geração do Resumo
+
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -201,7 +202,7 @@ if uploaded_file:
         resumo = f"{laboratorio}, {data_exame}: " + " | ".join(partes)
 
         st.subheader("Resumo gerado")
-        resumo_area = st.text_area("Resumo gerado:", resumo, height=300, key="resumo_area")
+        resumo_area = st.text_area("Resumo:", resumo, height=300, key="resumo_area")
 
         # Botão de copiar funcional usando JavaScript
         copy_button = st.button("Copiar resumo")
@@ -215,6 +216,6 @@ if uploaded_file:
                 unsafe_allow_html=True,
             )
 
-        st.caption("O botão 'Copiar resumo' agora copia diretamente para a área de transferência!")
+        st.caption("Clique em 'Copiar resumo' para copiar o texto para área de transferência.")
     else:
         st.warning("Nenhum exame encontrado no documento.")
