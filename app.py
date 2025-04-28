@@ -29,6 +29,7 @@ abreviacoes = {
     "Bilirrubina indireta": "BI",
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
+    "Gama glutamil transferase": "GGT",
     "Vitamina D": "Vit D",
     "Vitamina B12": "Vit B12",
     "PCR": "PCR",
@@ -56,7 +57,7 @@ def encontrar_exames(texto):
     resultados = {}
     for nome, abrev in abreviacoes.items():
         padrao = rf"{nome}.*?([-+]?\d+[\d\.,]*)"
-        matches = re.findall(padrao, texto, re.IGNORECASE)
+        matches = re.findall(padrao, texto, re.IGNORECASE | re.DOTALL)
         if matches:
             valor = matches[0].replace(",", ".")
             resultados[abrev] = valor
@@ -105,8 +106,10 @@ if uploaded_file:
         resumo = f"{laboratorio}, {data_exame}: " + " | ".join(partes)
 
         st.subheader("Resumo")
-        st.code(resumo, language="markdown")
-        st.download_button("Copiar Resumo", resumo, file_name="resumo.txt")
+        resumo_area = st.text_area("Resumo gerado:", resumo, height=200)
+        st.button("Copiar resumo", on_click=lambda: st.session_state.update({"_clipboard": resumo_area}))
 
+        # Pequena dica de uso
+        st.caption("Selecione e copie o texto acima manualmente se necessário.")
     else:
         st.warning("Nenhum exame conhecido encontrado no documento.")
