@@ -3,10 +3,40 @@ import streamlit as st
 import re
 import pdfplumber
 
-st.set_page_config(page_title="Resumo de Exames - Luana", layout="wide")
+st.set_page_config(page_title="Resumo de Exames - Luana", layout="centered")
 
-st.title("Resumo Automático de Exames Laboratoriais")
-st.write("Faça o upload de um PDF de exames laboratoriais e gere o resumo em uma linha para prontuário.")
+# Estilização geral
+st.markdown(
+    """
+    <style>
+    .title {
+        font-size: 42px;
+        color: #6EB5FF;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .subtitle {
+        font-size: 20px;
+        color: #7A7A7A;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    .block {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border: 1px solid #DDDDDD;
+        border-radius: 10px;
+        margin-top: 20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Títulos
+st.markdown('<div class="title">Resumo de Exames Laboratoriais</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Transforme rapidamente PDFs de exames em resumos prontos para o prontuário</div>', unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("Escolha o arquivo PDF do exame", type="pdf")
 
@@ -47,9 +77,11 @@ if uploaded_file:
     exames_dict, alterados = extrair_exames(texto)
     if exames_dict:
         linha = formatar_linha(exames_dict, lab="LAB", data="05/04/2025")
-        st.subheader("Linha para prontuário:")
+        st.markdown('<div class="block">', unsafe_allow_html=True)
+        st.subheader("Linha pronta para o prontuário:")
         st.code(linha, language="markdown")
+        st.markdown('</div>', unsafe_allow_html=True)
     if alterados:
-        st.subheader("Observações:")
+        st.subheader("Observações (valores alterados):")
         for a in alterados:
             st.markdown(f"- **{a}**")
