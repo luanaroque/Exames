@@ -1,11 +1,10 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
-import pandas as pd
-import base64
+import streamlit.components.v1 as components
 
-# Estilo da página
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
+
 st.markdown(
     """
     <style>
@@ -34,47 +33,21 @@ st.markdown(
 
 st.title("Transcritor de exames")
 
-# Abreviações de exames
 abreviacoes = {
-    "Hemoglobina": "Hb",
-    "Hematócrito": "Ht",
-    "Leucócitos": "Leuco",
-    "Plaquetas": "Plaq",
-    "Creatinina": "Cr",
-    "Ureia": "U",
-    "Glicose": "Gj",
-    "Hemoglobina glicada": "HbA1c",
-    "Colesterol total": "CT",
-    "HDL colesterol": "HDL",
-    "LDL colesterol": "LDL",
-    "VLDL": "VLDL",
-    "Triglicerídeos": "Tg",
-    "Sódio": "Na",
-    "Potássio": "K",
-    "Cálcio": "Ca",
-    "Magnésio": "Mg",
-    "Bilirrubina total": "BT",
-    "Bilirrubina direta": "BD",
-    "Bilirrubina indireta": "BI",
-    "Fosfatase alcalina": "FAL",
-    "Gama GT": "GGT",
-    "Vitamina D": "Vit D",
-    "Vitamina B12": "Vit B12",
-    "PCR": "PCR",
-    "Ferritina": "Ferritina",
-    "Saturação da transferrina": "Sat Transferrina",
-    "FSH": "FSH",
-    "LH": "LH",
-    "Estradiol": "E2",
-    "Progesterona": "Prog",
-    "Testosterona total": "Testo",
-    "HCG": "HCG",
-    "HIV 1/2": "HIV",
-    "Anti-HCV": "Anti-HCV",
-    "Sífilis": "Sífilis",
+    "Hemoglobina": "Hb", "Hematócrito": "Ht", "Leucócitos": "Leuco", "Plaquetas": "Plaq",
+    "Creatinina": "Cr", "Ureia": "U", "Glicose": "Gj", "Hemoglobina glicada": "HbA1c",
+    "Colesterol total": "CT", "HDL colesterol": "HDL", "LDL colesterol": "LDL",
+    "VLDL": "VLDL", "Triglicerídeos": "Tg", "Sódio": "Na", "Potássio": "K",
+    "Cálcio": "Ca", "Cálcio ionizado": "Ca ionizado", "Magnésio": "Mg", "Ácido Úrico": "AcU",
+    "Ferro": "Ferro", "Ferritina": "Ferritina", "Vitamina D": "Vit D", "Vitamina B12": "Vit B12",
+    "Proteína C reativa": "PCR", "Fosfatase alcalina": "FAL", "Gama GT": "GGT",
+    "TSH": "TSH", "T4 livre": "T4L", "T3": "T3", "FSH": "FSH", "LH": "LH",
+    "Estradiol": "E2", "Progesterona": "Prog", "Testosterona total": "Testo",
+    "Paratormônio": "PTH", "HCG": "HCG", "HIV 1/2": "HIV", "Anti-HCV": "Anti-HCV",
+    "Sífilis": "Sífilis", "VDRL": "Sífilis", "AgHBs": "AgHBs", "Anti-HBs": "Anti-HBs",
+    "Anti-HBe": "Anti-HBe", "Anti-HBc IgG": "Anti-HBc IgG", "Anti-HBc IgM": "Anti-HBc IgM",
 }
 
-# Funções
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -93,7 +66,7 @@ def limpar_texto(texto):
 def encontrar_valor(trecho):
     if re.search(r"não reagente|indetectável|não detectado", trecho, re.IGNORECASE):
         return "NR"
-    numeros = re.findall(r'[-+]?\d[\d,.]*', trecho)
+    numeros = re.findall(r'[-+]?\d[\d.,]*', trecho)
     if numeros:
         valor = numeros[0].replace(",", ".")
         return valor
@@ -120,17 +93,13 @@ def encontrar_lab_data(texto):
         lab = "Albert Einstein"
     elif "Fleury" in texto or "Edgar Rizzatti" in texto:
         lab = "Fleury"
+    elif "Hospital do Coração" in texto or "HCor" in texto:
+        lab = "HCor"
     datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto)
     if datas:
         data = datas[0]
     return lab, data
 
-def copiar_texto(texto):
-    b64 = base64.b64encode(texto.encode()).decode()
-    href = f'<a href="data:file/txt;base64,{b64}" download="resumo.txt" id="copiar">Copiar Resumo</a>'
-    st.markdown(href, unsafe_allow_html=True)
-
-# App
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -147,9 +116,12 @@ if uploaded_file:
 
     if exames:
         ordem = [
-            "Hb", "Ht", "Leuco", "Plaq", "Cr", "U", "Gj", "HbA1c", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "PCR", "Ferritina", "Sat Transferrina", "FSH", "LH",
-            "E2", "Prog", "Testo", "HCG", "HIV", "Anti-HCV", "Sífilis"
+            "Hb", "Ht", "Leuco", "Plaq", "Cr", "U", "Gj", "HbA1c",
+            "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg", "TGO", "TGP",
+            "FAL", "GGT", "Vit D", "Vit B12", "PCR", "Ferro", "Ferritina",
+            "Sat Transferrina", "TSH", "T4L", "T3", "FSH", "LH", "E2", "Prog", "Testo",
+            "PTH", "HCG", "HIV", "Anti-HCV", "Sífilis", "AgHBs", "Anti-HBs",
+            "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM"
         ]
         resumo_exames = []
         for exame in ordem:
@@ -159,9 +131,21 @@ if uploaded_file:
         resumo_final = f"{laboratorio}, {data_exame}: " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
-        resumo_area = st.text_area("Resumo:", resumo_final, height=300)
+        st.text_area("Resumo:", resumo_final, height=300)
 
-        st.button("Copiar resumo", on_click=lambda: st.session_state.update({"resumo_area": resumo_final}))
+        # Botão Copiar com JavaScript
+        components.html(f"""
+            <textarea id="to_copy" style="opacity:0;">{resumo_final}</textarea>
+            <button onclick="copyToClipboard()">Copiar resumo</button>
+            <script>
+            function copyToClipboard() {{
+                var copyText = document.getElementById("to_copy");
+                copyText.select();
+                document.execCommand("copy");
+                alert("Resumo copiado para a área de transferência!");
+            }}
+            </script>
+        """, height=100)
 
     else:
         st.warning("Nenhum exame encontrado no documento.")
