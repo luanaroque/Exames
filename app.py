@@ -6,36 +6,59 @@ st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.title("Transcritor de exames")
 
 abreviacoes = {
+    "Eritrócitos": "Eri",
     "Hemoglobina": "Hb",
     "Hematócrito": "Ht",
+    "Hemoglobina corpuscular média": "HCM",
+    "Volume corpuscular médio": "VCM",
+    "Concentração de hemoglobina corpuscular média": "CHCM",
+    "RDW": "RDW",
     "Leucócitos": "Leuco",
+    "Neutrófilos": "Neutro",
+    "Eosinófilos": "Eos",
+    "Basófilos": "Baso",
+    "Linfócitos": "Linf",
+    "Monócitos": "Mono",
     "Plaquetas": "Plaq",
+    "Volume plaquetário médio": "VPM",
     "Creatinina": "Cr",
     "Ureia": "U",
+    "TGO": "TGO",
+    "AST": "TGO",
+    "TGP": "TGP",
+    "ALT": "TGP",
+    "Fosfatase alcalina": "FAL",
+    "Gama GT": "GGT",
+    "Gama glutamil transferase": "GGT",
+    "Bilirrubina total": "BT",
+    "Bilirrubina direta": "BD",
+    "Bilirrubina indireta": "BI",
+    "PCR": "PCR",
+    "Proteína C reativa": "PCR",
+    "Ferro": "Ferro",
+    "Saturação da transferrina": "Sat Transferrina",
+    "Homocisteína": "Homocist",
+    "TSH": "TSH",
+    "T4 livre": "T4L",
+    "Tiroxina livre": "T4L",
+    "T3": "T3",
+    "Triiodotironina": "T3",
+    "25 hidroxi-vitamina D": "Vit D",
+    "25-hidroxivitamina D": "Vit D",
+    "1,25 dihidroxivitamina D": "1,25 Vit D",
+    "Vitamina D": "Vit D",
+    "Vitamina B12": "Vit B12",
     "Glicose": "Gj",
     "Glicemia de jejum": "Gj",
     "Hemoglobina glicada": "HbA1c",
     "Colesterol total": "CT",
     "HDL colesterol": "HDL",
     "LDL colesterol": "LDL",
-    "VLDL": "VLDL",
+    "VLDL colesterol": "VLDL",
+    "Não-HDL colesterol": "não-HDL",
     "Triglicerídeos": "Tg",
-    "Sódio": "Na",
-    "Potássio": "K",
-    "Cálcio": "Ca",
-    "Magnésio": "Mg",
-    "Bilirrubina total": "BT",
-    "Bilirrubina direta": "BD",
-    "Bilirrubina indireta": "BI",
-    "Fosfatase alcalina": "FAL",
-    "Gama GT": "GGT",
-    "Gama glutamil transferase": "GGT",
-    "Vitamina D": "Vit D",
-    "Vitamina B12": "Vit B12",
-    "PCR": "PCR",
-    "Proteína C reativa": "PCR",
-    "Ferritina": "Ferritina",
-    "Saturação transferrina": "Sat Transferrina",
+    "Triglicérides": "Tg",
+    "HCG": "HCG",
 }
 
 def extrair_texto(pdf_file):
@@ -51,16 +74,23 @@ def limpar_texto(texto):
     texto = re.sub(r'ANVISA.*', '', texto)
     texto = re.sub(r'Tel.*', '', texto)
     texto = re.sub(r'Canal Médico.*', '', texto)
+    texto = re.sub(r'Página:.*', '', texto)
     return texto
 
 def encontrar_exames(texto):
     resultados = {}
-    for nome, abrev in abreviacoes.items():
-        padrao = rf"{nome}.*?([-+]?\d+[\d\.,]*)"
-        matches = re.findall(padrao, texto, re.IGNORECASE | re.DOTALL)
-        if matches:
-            valor = matches[0].replace(",", ".")
-            resultados[abrev] = valor
+    linhas = texto.split('\n')
+    for idx, linha in enumerate(linhas):
+        for nome, abrev in abreviacoes.items():
+            if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
+                # Tenta encontrar valor na mesma linha
+                match = re.search(r'([-+]?\d+[\d\.,]*)', linha)
+                # Se não encontrar, tenta buscar na próxima linha
+                if not match and idx + 1 < len(linhas):
+                    match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 1])
+                if match:
+                    valor = match.group(1).replace(",", ".")
+                    resultados[abrev] = valor
     return resultados
 
 def encontrar_lab_data(texto):
@@ -70,7 +100,6 @@ def encontrar_lab_data(texto):
         lab = "Albert Einstein"
     elif "Fleury" in texto or "Edgar Rizzatti" in texto:
         lab = "Fleury"
-
     datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto)
     if datas:
         data = datas[0]
@@ -106,10 +135,9 @@ if uploaded_file:
         resumo = f"{laboratorio}, {data_exame}: " + " | ".join(partes)
 
         st.subheader("Resumo")
-        resumo_area = st.text_area("Resumo gerado:", resumo, height=200)
+        resumo_area = st.text_area("Resumo gerado:", resumo, height=300)
         st.button("Copiar resumo", on_click=lambda: st.session_state.update({"_clipboard": resumo_area}))
 
-        # Pequena dica de uso
         st.caption("Selecione e copie o texto acima manualmente se necessário.")
     else:
         st.warning("Nenhum exame conhecido encontrado no documento.")
