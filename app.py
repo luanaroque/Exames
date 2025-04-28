@@ -32,7 +32,7 @@ st.markdown(
 
 st.title("Transcritor de exames")
 
-# Lista de abreviações
+# Abreviações
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Leucócitos": "Leuco",
@@ -89,7 +89,6 @@ abreviacoes = {
     "FTA-ABS": "FTA-ABS"
 }
 
-# Faixas plausíveis
 faixas_padroes = {
     "Ferro": (30, 300),
     "Sat Transferrina": (20, 60),
@@ -98,7 +97,7 @@ faixas_padroes = {
     "Cr": (0.4, 2),
 }
 
-# Funções auxiliares
+# Funções de leitura
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -161,9 +160,6 @@ def encontrar_lab_data(texto):
         data = datas[0]
     return lab, data
 
-
-
-
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -204,18 +200,14 @@ if uploaded_file:
         st.subheader("Resumo gerado")
         resumo_area = st.text_area("Resumo:", resumo, height=300, key="resumo_area")
 
-        # Botão de copiar funcional usando JavaScript
-        copy_button = st.button("Copiar resumo")
-        if copy_button:
-            st.markdown(
-                f"""
-                <script>
-                navigator.clipboard.writeText(`{resumo}`);
-                </script>
-                """,
-                unsafe_allow_html=True,
-            )
+        # Botão de copiar alternativo (download do resumo como txt)
+        st.download_button(
+            label="Copiar resumo",
+            data=resumo,
+            file_name="resumo.txt",
+            mime="text/plain"
+        )
 
-        st.caption("Clique em 'Copiar resumo' para copiar o texto para área de transferência.")
+        st.caption("Clique em 'Copiar resumo' para copiar ou baixar o texto.")
     else:
         st.warning("Nenhum exame encontrado no documento.")
