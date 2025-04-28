@@ -1,6 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
+import streamlit.components.v1 as components
 
 # Estilo da página
 st.set_page_config(page_title="Transcritor de Exames", layout="wide")
@@ -83,17 +84,15 @@ def encontrar_valor(trecho):
 
 def encontrar_exames(texto):
     resultados = {}
-    linhas = texto.split('\n')
-    for idx, linha in enumerate(linhas):
-        for nome, abrev in abreviacoes.items():
-            if nome.lower() in linha.lower():
-                trecho = linha
-                # Pega também a linha seguinte para garantir captura do valor
-                if idx + 1 < len(linhas):
-                    trecho += ' ' + linhas[idx + 1]
-                valor = encontrar_valor(trecho)
-                if valor:
-                    resultados[abrev] = valor
+    texto_normalizado = texto.replace('\n', ' ')
+    for nome, abrev in abreviacoes.items():
+        if nome.lower() in texto_normalizado.lower():
+            padrao = rf"{nome}.*?(não reagente|indetectável|não detectado|[-+]?\d[\d,.]*)"
+            busca = re.search(padrao, texto_normalizado, re.IGNORECASE)
+            if busca:
+                resultado = encontrar_valor(busca.group())
+                if resultado:
+                    resultados[abrev] = resultado
     return resultados
 
 def encontrar_lab_data(texto):
@@ -139,16 +138,28 @@ if uploaded_file:
             resumo_final += f"{laboratorio}"
         if data_exame:
             resumo_final += f", {data_exame}"
-        resumo_final += ": " + " | ".join(resumo_exames)
+        if resumo_exames:
+            resumo_final += ": " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
         resumo = st.text_area("Resumo:", resumo_final, height=300, key="resumo_texto")
 
-        # Botão copiar usando Streamlit
-        if st.button("Copiar resumo"):
-            st.session_state.resumo_texto = resumo
-            st.experimental_set_query_params(text=resumo)
-            st.success("Texto pronto para copiar manualmente: clique e segure o campo e copie.")
+        # Botão copiar com componente
+        copy_code = f"""
+        <script>
+        function copyToClipboard(text) {{
+          navigator.clipboard.writeText(text).then(function() {{
+            alert('Resumo copiado com sucesso!');
+          }}, function(err) {{
+            alert('Erro ao copiar o resumo');
+          }});
+        }}
+        </script>
+        <button onclick="copyToClipboard(`{resumo_final}`)" style="background-color:#4d79ff;color:white;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;font-size:16px;cursor:pointer;">
+            Copiar resumo
+        </button>
+        """
+        components.html(copy_code, height=100)
 
     else:
         st.warning("Nenhum exame encontrado no documento.")
