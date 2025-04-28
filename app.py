@@ -2,10 +2,31 @@ import streamlit as st
 import fitz  # PyMuPDF
 import re
 
+# Estilo da página
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #e6f0ff;
+        color: #333333;
+    }
+    textarea {
+        font-size: 18px !important;
+        color: #333333 !important;
+    }
+    .stButton button {
+        background-color: #4d79ff;
+        color: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("Transcritor de exames")
 
-# Lista de abreviações dos exames
+# Abreviações dos exames
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Leucócitos": "Leuco",
@@ -20,6 +41,8 @@ abreviacoes = {
     "Cálcio": "Ca",
     "Cálcio ionizado": "Ca ionizado",
     "Ferro": "Ferro",
+    "Saturação da transferrina": "Sat Transferrina",
+    "Índice de saturação da transferrina": "Sat Transferrina",
     "Zinco": "Zinco",
     "Ácido fólico": "Ácido fólico",
     "Vitamina B12": "Vit B12",
@@ -32,6 +55,7 @@ abreviacoes = {
     "VLDL colesterol": "VLDL",
     "Não-HDL colesterol": "não-HDL",
     "Triglicerídeos": "Tg",
+    "Triglicérides": "Tg",
     "TGO": "TGO",
     "AST": "TGO",
     "TGP": "TGP",
@@ -90,16 +114,22 @@ def encontrar_exames(texto):
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
             if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
-                # Procurar valor real nas próximas 2 linhas se não achar na mesma
-                match = re.search(r'([-+]?\d+[\d\.,]*)', linha)
-                if not match and idx + 1 < len(linhas):
-                    match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 1])
-                if not match and idx + 2 < len(linhas):
-                    match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 2])
-                if match:
-                    valor = match.group(1).replace(",", ".")
-                    if abrev in exames_hemograma or abrev not in {"Eri", "Ht", "VCM", "HCM", "CHCM", "Neutro", "Eos", "Baso", "Linf", "Mono", "RDW"}:
-                        resultados[abrev] = valor
+                trecho = linha
+                if idx + 1 < len(linhas):
+                    trecho += ' ' + linhas[idx + 1]
+                if idx + 2 < len(linhas):
+                    trecho += ' ' + linhas[idx + 2]
+
+                if re.search(r"indetectável|não reagente|não detectado", trecho, re.IGNORECASE):
+                    resultados[abrev] = "NR"
+                else:
+                    matches = re.findall(r'([-+]?\d+[.,]?\d*)', trecho)
+                    numeros = [float(m.replace(",", ".")) for m in matches if '-' not in m and float(m.replace(",", ".")) > 0]
+                    if numeros:
+                        maior = max(numeros)
+                        if maior.is_integer():
+                            maior = int(maior)
+                        resultados[abrev] = str(maior)
     return resultados
 
 def encontrar_lab_data(texto):
@@ -135,16 +165,19 @@ if uploaded_file:
     if exames:
         partes = []
         grupo = []
-        ordem = ["Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-                 "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "T4", 
-                 "FSH", "LH", "E2", "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg",
-                 "Ácido úrico", "Na", "K", "Ca", "Ca ionizado", "PCR", "HIV", "Anti-HCV", "Anti-HBs",
-                 "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM", "Sífilis", "VDRL", "FTA-ABS", "HCG", "Zinco", "Ácido fólico", "Ferro"]
-
+        ordem = [
+            "Hb", "Leuco", "Plaq",
+            "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
+            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12",
+            "TSH", "T4L", "T3", "FSH", "LH", "E2", "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg",
+            "Ácido úrico", "Na", "K", "Ca", "Ca ionizado",
+            "PCR", "Sat Transferrina", "Ferro",
+            "HCG", "HIV", "Sífilis", "Anti-HCV", "Anti-HBs", "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM"
+        ]
         for exame in ordem:
             if exame in exames:
                 grupo.append(f"{exame} {exames[exame]}")
-                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "HIV", "Anti-HCV", "Ferro"]:
+                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina", "Ferro", "Anti-HBs"]:
                     partes.append(" ".join(grupo))
                     grupo = []
         if grupo:
