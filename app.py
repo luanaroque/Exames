@@ -7,12 +7,9 @@ st.title("Transcritor de exames")
 
 # Lista de abreviações dos exames
 abreviacoes = {
-    # Hemograma (só Hb, Leuco e Plaq)
     "Hemoglobina": "Hb",
     "Leucócitos": "Leuco",
     "Plaquetas": "Plaq",
-
-    # Bioquímica
     "Glicose": "Gj",
     "Glicemia de jejum": "Gj",
     "Creatinina": "Cr",
@@ -27,19 +24,14 @@ abreviacoes = {
     "Ácido fólico": "Ácido fólico",
     "Vitamina B12": "Vit B12",
     "Vitamina D": "Vit D",
-    "1,25 dihidroxivitamina D": "1,25 Vit D",
-    "25 hidroxivitamina D": "Vit D",
-
-    # Perfil lipídico
+    "25-hidroxivitamina D": "Vit D",
+    "1,25-dihidroxivitamina D": "1,25 Vit D",
     "Colesterol total": "CT",
     "HDL colesterol": "HDL",
     "LDL colesterol": "LDL",
     "VLDL colesterol": "VLDL",
     "Não-HDL colesterol": "não-HDL",
     "Triglicerídeos": "Tg",
-    "Triglicérides": "Tg",
-
-    # Hepáticas
     "TGO": "TGO",
     "AST": "TGO",
     "TGP": "TGP",
@@ -47,11 +39,8 @@ abreviacoes = {
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
     "Gama glutamil transferase": "GGT",
-
-    # Endócrinos
     "TSH": "TSH",
     "T4 livre": "T4L",
-    "T4": "T4",
     "T3": "T3",
     "FSH": "FSH",
     "LH": "LH",
@@ -64,13 +53,7 @@ abreviacoes = {
     "Paratormônio": "PTH",
     "Hormônio paratireoideo": "PTH",
     "17-alfa-hidroxiprogesterona": "17-OH-Pg",
-    
-    # Marcadores inflamatórios
     "Proteína C reativa": "PCR",
-    "PCR": "PCR",
-    "VHS": "VHS",
-    
-    # Sorologias
     "HIV 1/2": "HIV",
     "Anti-HCV": "Anti-HCV",
     "Anti-HBs": "Anti-HBs",
@@ -81,10 +64,9 @@ abreviacoes = {
     "Anti-HBc IgM": "Anti-HBc IgM",
     "Sífilis": "Sífilis",
     "VDRL": "VDRL",
-    "FTA-ABS": "FTA-ABS",
+    "FTA-ABS": "FTA-ABS"
 }
 
-# Apenas Hb, Leuco e Plaq do hemograma
 exames_hemograma = {"Hb", "Leuco", "Plaq"}
 
 def extrair_texto(pdf_file):
@@ -108,12 +90,15 @@ def encontrar_exames(texto):
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
             if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
+                # Procurar valor real nas próximas 2 linhas se não achar na mesma
                 match = re.search(r'([-+]?\d+[\d\.,]*)', linha)
                 if not match and idx + 1 < len(linhas):
                     match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 1])
+                if not match and idx + 2 < len(linhas):
+                    match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 2])
                 if match:
                     valor = match.group(1).replace(",", ".")
-                    if abrev in exames_hemograma or abrev not in {"Eri", "Ht", "RDW", "VCM", "HCM", "CHCM", "Neutro", "Eos", "Baso", "Linf", "Mono"}:
+                    if abrev in exames_hemograma or abrev not in {"Eri", "Ht", "VCM", "HCM", "CHCM", "Neutro", "Eos", "Baso", "Linf", "Mono", "RDW"}:
                         resultados[abrev] = valor
     return resultados
 
@@ -151,7 +136,7 @@ if uploaded_file:
         partes = []
         grupo = []
         ordem = ["Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-                 "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T4", "T3",
+                 "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "T4", 
                  "FSH", "LH", "E2", "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg",
                  "Ácido úrico", "Na", "K", "Ca", "Ca ionizado", "PCR", "HIV", "Anti-HCV", "Anti-HBs",
                  "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM", "Sífilis", "VDRL", "FTA-ABS", "HCG", "Zinco", "Ácido fólico", "Ferro"]
@@ -159,7 +144,7 @@ if uploaded_file:
         for exame in ordem:
             if exame in exames:
                 grupo.append(f"{exame} {exames[exame]}")
-                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina", "HIV", "Anti-HCV", "Ferro"]:
+                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "HIV", "Anti-HCV", "Ferro"]:
                     partes.append(" ".join(grupo))
                     grupo = []
         if grupo:
