@@ -1,8 +1,10 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
+import pandas as pd
+import base64
 
-# Estilo personalizado
+# Estilo da página
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.markdown(
     """
@@ -32,72 +34,47 @@ st.markdown(
 
 st.title("Transcritor de exames")
 
-# Abreviações
+# Abreviações de exames
 abreviacoes = {
     "Hemoglobina": "Hb",
+    "Hematócrito": "Ht",
     "Leucócitos": "Leuco",
     "Plaquetas": "Plaq",
-    "Glicose": "Gj",
     "Creatinina": "Cr",
     "Ureia": "U",
-    "Ácido úrico": "Ácido úrico",
-    "Sódio": "Na",
-    "Potássio": "K",
-    "Cálcio": "Ca",
-    "Cálcio ionizado": "Ca ionizado",
-    "Ferro": "Ferro",
-    "Saturação da transferrina": "Sat Transferrina",
-    "Zinco": "Zinco",
-    "Ácido fólico": "Ácido fólico",
-    "Vitamina B12": "Vit B12",
-    "Vitamina D": "Vit D",
-    "1,25-dihidroxivitamina D": "1,25 Vit D",
+    "Glicose": "Gj",
+    "Hemoglobina glicada": "HbA1c",
     "Colesterol total": "CT",
     "HDL colesterol": "HDL",
     "LDL colesterol": "LDL",
-    "VLDL colesterol": "VLDL",
-    "Não-HDL colesterol": "não-HDL",
+    "VLDL": "VLDL",
     "Triglicerídeos": "Tg",
-    "TGO": "TGO",
-    "TGP": "TGP",
+    "Sódio": "Na",
+    "Potássio": "K",
+    "Cálcio": "Ca",
+    "Magnésio": "Mg",
+    "Bilirrubina total": "BT",
+    "Bilirrubina direta": "BD",
+    "Bilirrubina indireta": "BI",
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
-    "TSH": "TSH",
-    "T4 livre": "T4L",
-    "T3": "T3",
+    "Vitamina D": "Vit D",
+    "Vitamina B12": "Vit B12",
+    "PCR": "PCR",
+    "Ferritina": "Ferritina",
+    "Saturação da transferrina": "Sat Transferrina",
     "FSH": "FSH",
     "LH": "LH",
     "Estradiol": "E2",
     "Progesterona": "Prog",
     "Testosterona total": "Testo",
-    "SHBG": "SHBG",
-    "DHEA-S": "DHEA-S",
     "HCG": "HCG",
-    "Paratormônio": "PTH",
-    "17-alfa-hidroxiprogesterona": "17-OH-Pg",
-    "Proteína C reativa": "PCR",
     "HIV 1/2": "HIV",
     "Anti-HCV": "Anti-HCV",
-    "Anti-HBs": "Anti-HBs",
-    "Antígeno HBs": "AgHBs",
-    "Antígeno HBe": "AgHBe",
-    "Anti-HBe": "Anti-HBe",
-    "Anti-HBc IgG": "Anti-HBc IgG",
-    "Anti-HBc IgM": "Anti-HBc IgM",
     "Sífilis": "Sífilis",
-    "VDRL": "VDRL",
-    "FTA-ABS": "FTA-ABS"
 }
 
-faixas_padroes = {
-    "Ferro": (30, 300),
-    "Sat Transferrina": (20, 60),
-    "PCR": (0, 10),
-    "Gj": (60, 110),
-    "Cr": (0.4, 2),
-}
-
-# Funções de leitura
+# Funções
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -106,42 +83,32 @@ def extrair_texto(pdf_file):
     return texto
 
 def limpar_texto(texto):
-    texto = re.sub(r'\n+', '\n', texto)
+    texto = re.sub(r'(\n)+', '\n', texto)
     texto = re.sub(r'CRM.*', '', texto)
     texto = re.sub(r'ANVISA.*', '', texto)
     texto = re.sub(r'Tel.*', '', texto)
     texto = re.sub(r'Página.*', '', texto)
     return texto
 
-def encontrar_valor_puro(trecho, exame):
-    if re.search(r"indetectável|não reagente|não detectado", trecho, re.IGNORECASE):
+def encontrar_valor(trecho):
+    if re.search(r"não reagente|indetectável|não detectado", trecho, re.IGNORECASE):
         return "NR"
-    matches = re.findall(r'([-+]?\d+[.,]?\d*)', trecho)
-    numeros = [float(m.replace(",", ".")) for m in matches if '-' not in m]
-    if not numeros:
-        return None
-    if exame in faixas_padroes:
-        faixa = faixas_padroes[exame]
-        numeros_filtrados = [n for n in numeros if faixa[0] <= n <= faixa[1]]
-        if numeros_filtrados:
-            return str(int(numeros_filtrados[0]) if numeros_filtrados[0].is_integer() else numeros_filtrados[0])
-        else:
-            return None
-    maior = max(numeros)
-    return str(int(maior) if maior.is_integer() else maior)
+    numeros = re.findall(r'[-+]?\d[\d,.]*', trecho)
+    if numeros:
+        valor = numeros[0].replace(",", ".")
+        return valor
+    return None
 
 def encontrar_exames(texto):
     resultados = {}
     linhas = texto.split('\n')
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
-            if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
+            if nome.lower() in linha.lower():
                 trecho = linha
                 if idx + 1 < len(linhas):
                     trecho += ' ' + linhas[idx + 1]
-                if idx + 2 < len(linhas):
-                    trecho += ' ' + linhas[idx + 2]
-                valor = encontrar_valor_puro(trecho, abrev)
+                valor = encontrar_valor(trecho)
                 if valor:
                     resultados[abrev] = valor
     return resultados
@@ -153,14 +120,17 @@ def encontrar_lab_data(texto):
         lab = "Albert Einstein"
     elif "Fleury" in texto or "Edgar Rizzatti" in texto:
         lab = "Fleury"
-    elif "Hospital do Coração" in texto or "HCor" in texto:
-        lab = "HCor"
     datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto)
     if datas:
         data = datas[0]
     return lab, data
 
+def copiar_texto(texto):
+    b64 = base64.b64encode(texto.encode()).decode()
+    href = f'<a href="data:file/txt;base64,{b64}" download="resumo.txt" id="copiar">Copiar Resumo</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
+# App
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -169,8 +139,6 @@ if uploaded_file:
     exames = encontrar_exames(texto)
     lab, data = encontrar_lab_data(texto)
 
-    st.subheader("Informações do Exame")
-
     col1, col2 = st.columns(2)
     with col1:
         laboratorio = st.text_input("Laboratório", lab if lab else "")
@@ -178,37 +146,22 @@ if uploaded_file:
         data_exame = st.text_input("Data da coleta", data if data else "")
 
     if exames:
-        partes = []
-        grupo = []
         ordem = [
-            "Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "FSH", "LH", "E2",
-            "Prog", "Testo", "SHBG", "DHEA-S", "PTH", "1,25 Vit D", "17-OH-Pg", "Ácido úrico", "Na",
-            "K", "Ca", "Ca ionizado", "PCR", "Sat Transferrina", "Ferro",
-            "HCG", "HIV", "Sífilis", "Anti-HCV", "Anti-HBs", "AgHBs", "AgHBe", "Anti-HBe", "Anti-HBc IgG", "Anti-HBc IgM"
+            "Hb", "Ht", "Leuco", "Plaq", "Cr", "U", "Gj", "HbA1c", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
+            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "PCR", "Ferritina", "Sat Transferrina", "FSH", "LH",
+            "E2", "Prog", "Testo", "HCG", "HIV", "Anti-HCV", "Sífilis"
         ]
+        resumo_exames = []
         for exame in ordem:
             if exame in exames:
-                grupo.append(f"{exame} {exames[exame]}")
-                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina", "Ferro", "Anti-HBs"]:
-                    partes.append(" ".join(grupo))
-                    grupo = []
-        if grupo:
-            partes.append(" ".join(grupo))
+                resumo_exames.append(f"{exame} {exames[exame]}")
 
-        resumo = f"{laboratorio}, {data_exame}: " + " | ".join(partes)
+        resumo_final = f"{laboratorio}, {data_exame}: " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
-        resumo_area = st.text_area("Resumo:", resumo, height=300, key="resumo_area")
+        resumo_area = st.text_area("Resumo:", resumo_final, height=300)
 
-        # Botão de copiar alternativo (download do resumo como txt)
-        st.download_button(
-            label="Copiar resumo",
-            data=resumo,
-            file_name="resumo.txt",
-            mime="text/plain"
-        )
+        st.button("Copiar resumo", on_click=lambda: st.session_state.update({"resumo_area": resumo_final}))
 
-        st.caption("Clique em 'Copiar resumo' para copiar o texto.")
     else:
         st.warning("Nenhum exame encontrado no documento.")
