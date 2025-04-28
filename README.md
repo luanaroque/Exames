@@ -96,9 +96,3 @@ streamlit run app.py
 - Caso o PDF esteja com layout muito diferente (ex.: imagens ou colunas complicadas), a extração pode não ser perfeita.
 
 ---
-
-## Autor
-
-Feito com carinho por [Seu Nome Aqui].
-
-Se quiser contribuir, sinta-se à vontade para abrir Pull Requests!
