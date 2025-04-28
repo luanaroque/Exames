@@ -25,7 +25,7 @@ def extrair_exames(texto):
     exames = {}
     alterados = []
     for exame in exames_padrao:
-        pattern = re.compile(rf"{exame}[\s:]*([<]?[0-9]+[.,]?[0-9]*)", re.IGNORECASE)
+        pattern = re.compile(rf"{exame}[\s:]*([-<]?[0-9]+[.,]?[0-9]*)", re.IGNORECASE)
         match = pattern.search(texto)
         if match:
             valor = match.group(1).replace(",", ".")
@@ -36,19 +36,19 @@ def extrair_exames(texto):
                 alterados.append(f"{exame} {valor} (elevado)")
             elif exame == "Anti-TPO" and float(valor) > 60:
                 alterados.append(f"{exame} {valor} (elevado)")
-        else:
-            exames[exame] = "-"
     return exames, alterados
 
 def formatar_linha(exames_dict, lab="LABORATÓRIO", data="DATA"):
-    return f"{lab}, {data}: " + " ".join([f"{ex} {exames_dict[ex]}" for ex in exames_padrao])
+    componentes = [f"{ex} {valor}" for ex, valor in exames_dict.items()]
+    return f"{lab}, {data}: " + " ".join(componentes)
 
 if uploaded_file:
     texto = extrair_texto(uploaded_file)
     exames_dict, alterados = extrair_exames(texto)
-    linha = formatar_linha(exames_dict, lab="LAB", data="05/04/2025")
-    st.subheader("Linha para prontuário:")
-    st.code(linha, language="markdown")
+    if exames_dict:
+        linha = formatar_linha(exames_dict, lab="LAB", data="05/04/2025")
+        st.subheader("Linha para prontuário:")
+        st.code(linha, language="markdown")
     if alterados:
         st.subheader("Observações:")
         for a in alterados:
