@@ -2,7 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 import re
 
-# Estilo personalizado
+# Estilo visual
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.markdown(
     """
@@ -97,7 +97,7 @@ faixas_padroes = {
     "Cr": (0.4, 2),
 }
 
-# Funções de leitura
+# Funções de extração
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -113,22 +113,24 @@ def limpar_texto(texto):
     texto = re.sub(r'Página.*', '', texto)
     return texto
 
-def encontrar_valor_puro(trecho, exame):
-    if re.search(r"indetectável|não reagente|não detectado", trecho, re.IGNORECASE):
+def encontrar_valor_puro(linha, exame):
+    if re.search(r"indetectável|não reagente|não detectado", linha, re.IGNORECASE):
         return "NR"
-    matches = re.findall(r'([-+]?\d+[.,]?\d*)', trecho)
-    numeros = [float(m.replace(",", ".")) for m in matches if '-' not in m]
-    if not numeros:
-        return None
+    
     if exame in faixas_padroes:
         faixa = faixas_padroes[exame]
-        numeros_filtrados = [n for n in numeros if faixa[0] <= n <= faixa[1]]
-        if numeros_filtrados:
-            return str(int(numeros_filtrados[0]) if numeros_filtrados[0].is_integer() else numeros_filtrados[0])
-        else:
-            return None
-    maior = max(numeros)
-    return str(int(maior) if maior.is_integer() else maior)
+        numeros = re.findall(r'([-+]?\d+[.,]?\d*)', linha)
+        for numero in numeros:
+            valor = float(numero.replace(',', '.'))
+            if faixa[0] <= valor <= faixa[1]:
+                return str(int(valor) if valor.is_integer() else valor)
+        return None
+    else:
+        numeros = re.findall(r'([-+]?\d+[.,]?\d*)', linha)
+        if numeros:
+            valor = float(numeros[0].replace(',', '.'))
+            return str(int(valor) if valor.is_integer() else valor)
+    return None
 
 def encontrar_exames(texto):
     resultados = {}
@@ -136,12 +138,7 @@ def encontrar_exames(texto):
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
             if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
-                trecho = linha
-                if idx + 1 < len(linhas):
-                    trecho += ' ' + linhas[idx + 1]
-                if idx + 2 < len(linhas):
-                    trecho += ' ' + linhas[idx + 2]
-                valor = encontrar_valor_puro(trecho, abrev)
+                valor = encontrar_valor_puro(linha, abrev)
                 if valor:
                     resultados[abrev] = valor
     return resultados
@@ -159,6 +156,8 @@ def encontrar_lab_data(texto):
     if datas:
         data = datas[0]
     return lab, data
+
+
 
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
@@ -200,14 +199,22 @@ if uploaded_file:
         st.subheader("Resumo gerado")
         resumo_area = st.text_area("Resumo:", resumo, height=300, key="resumo_area")
 
-        # Botão de copiar alternativo (download do resumo como txt)
-        st.download_button(
-            label="Copiar resumo",
-            data=resumo,
-            file_name="resumo.txt",
-            mime="text/plain"
+        st.markdown("""
+            <script>
+            function copiarTexto() {
+                navigator.clipboard.writeText(document.getElementById("resumo-text").value);
+            }
+            </script>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f'<textarea id="resumo-text" style="visibility:hidden; height:1px">{resumo}</textarea>', unsafe_allow_html=True)
+
+        st.button("Copiar resumo", on_click=None)
+        st.markdown(
+            '<button onclick="copiarTexto()" style="background-color:#4d79ff;color:white;border:none;padding:10px 20px;font-size:16px;border-radius:8px;">Clique aqui para copiar o resumo</button>',
+            unsafe_allow_html=True
         )
 
-        st.caption("Clique em 'Copiar resumo' para copiar ou baixar o texto.")
+        st.caption("Clique em 'Clique aqui para copiar o resumo' para copiar automaticamente.")
     else:
         st.warning("Nenhum exame encontrado no documento.")
