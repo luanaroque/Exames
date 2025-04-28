@@ -46,14 +46,16 @@ abreviacoes = {
     "FSH": "FSH", "LH": "LH", "Estradiol": "E2", "Progesterona": "Prog", "Testosterona total": "Testo",
     "Paratormônio": "PTH", "HCG": "HCG", "HIV 1/2": "HIV", "Anti-HCV": "Anti-HCV",
     "Sífilis": "Sífilis", "VDRL": "Sífilis", "AgHBs": "AgHBs", "Anti-HBs": "Anti-HBs",
-    "Anti-HBe": "Anti-HBe", "Anti-HBc IgG": "Anti-HBc IgG", "Anti-HBc IgM": "Anti-HBc IgM"
+    "Anti-HBe": "Anti-HBe", "Anti-HBc IgG": "Anti-HBc IgG", "Anti-HBc IgM": "Anti-HBc IgM",
+    "Hormônio Anti-Mülleriano": "AMH"
 }
 
 # Palavras proibidas (linhas que devem ser ignoradas)
 proibidos = [
-    "CRM", "Página", "Assinatura", "Responsável Técnico", "Imunoturbidimetria",
-    "Data de Nascimento", "Médico", "Paciente", "RDC", "Norma", "Emitido", "Ficha",
-    "Método", "Referência", "Unidade", "Coleta", "Nascimento", "Sexo", "CPF", "Convênio"
+    "CRM", "Página", "Assinatura", "Responsável Técnico", "Data de Nascimento",
+    "Médico", "Paciente", "RDC", "Norma", "Emitido", "Ficha", "Método",
+    "Referência", "Unidade", "Coleta", "Nascimento", "Sexo", "CPF", "Convênio",
+    "Nota", "Interpretação", "Maior ou igual", "Faixa de referência", "Resultado Geral"
 ]
 
 def extract_text_from_pdf(pdf_file: BytesIO) -> str:
@@ -80,14 +82,12 @@ def parse_exam_data(text: str) -> List[Dict[str, str]]:
         if not is_valid_exam(line):
             continue
         
-        # Padrão de nome: valor
-        match = re.match(r'([^:\n=]+)\s*[:=]\s*(.+)', line)
+        match = re.match(r'([^:=\n]+)\s*[:=]\s*([\d,.\-]+)', line)
         if match:
             name = match.group(1).strip()
-            result = match.group(2).strip()
+            result = match.group(2).strip().replace(",", ".")
             exams.append({'name': name, 'result': result})
         else:
-            # Padrão de reagente/não reagente
             reagente = re.search(r'(.*?)(Reagente|Não Reagente|Positivo|Negativo)', line, re.IGNORECASE)
             if reagente:
                 name = reagente.group(1).strip()
