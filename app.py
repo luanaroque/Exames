@@ -2,7 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF
 import re
 
-# Configurações de estilo
+# Estilo personalizado
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.markdown(
     """
@@ -15,8 +15,8 @@ st.markdown(
         color: #333333 !important;
         font-size: 16px !important;
     }
-    label {
-        color: #666666 !important;
+    label, h1, h2, h3, .stMarkdown p {
+        color: #ffffff !important;
         font-weight: bold;
     }
     .stButton button {
@@ -99,9 +99,7 @@ faixas_padroes = {
     "Cr": (0.4, 2),
 }
 
-
-
-
+# Funções de extração
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -164,8 +162,7 @@ def encontrar_lab_data(texto):
 
 
 
-
-
+# Upload do PDF e Geração do Resumo
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -203,10 +200,21 @@ if uploaded_file:
 
         resumo = f"{laboratorio}, {data_exame}: " + " | ".join(partes)
 
-        st.subheader("Resumo")
-        resumo_area = st.text_area("Resumo gerado:", resumo, height=300)
-        st.button("Copiar resumo", on_click=lambda: st.session_state.update({"_clipboard": resumo_area}))
+        st.subheader("Resumo gerado")
+        resumo_area = st.text_area("Resumo gerado:", resumo, height=300, key="resumo_area")
 
-        st.caption("Selecione e copie o texto acima manualmente se necessário.")
+        # Botão de copiar funcional usando JavaScript
+        copy_button = st.button("Copiar resumo")
+        if copy_button:
+            st.markdown(
+                f"""
+                <script>
+                navigator.clipboard.writeText(`{resumo}`);
+                </script>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.caption("O botão 'Copiar resumo' agora copia diretamente para a área de transferência!")
     else:
         st.warning("Nenhum exame encontrado no documento.")
