@@ -5,24 +5,23 @@ import re
 st.set_page_config(page_title="Transcritor de exames", layout="wide")
 st.title("Transcritor de exames")
 
+# Lista de exames e suas abreviações
 abreviacoes = {
-    "Eritrócitos": "Eri",
     "Hemoglobina": "Hb",
-    "Hematócrito": "Ht",
-    "Hemoglobina corpuscular média": "HCM",
-    "Volume corpuscular médio": "VCM",
-    "Concentração de hemoglobina corpuscular média": "CHCM",
-    "RDW": "RDW",
     "Leucócitos": "Leuco",
-    "Neutrófilos": "Neutro",
-    "Eosinófilos": "Eos",
-    "Basófilos": "Baso",
-    "Linfócitos": "Linf",
-    "Monócitos": "Mono",
     "Plaquetas": "Plaq",
-    "Volume plaquetário médio": "VPM",
     "Creatinina": "Cr",
     "Ureia": "U",
+    "Glicose": "Gj",
+    "Glicemia de jejum": "Gj",
+    "Hemoglobina glicada": "HbA1c",
+    "Colesterol total": "CT",
+    "HDL colesterol": "HDL",
+    "LDL colesterol": "LDL",
+    "VLDL colesterol": "VLDL",
+    "Triglicerídeos": "Tg",
+    "Triglicérides": "Tg",
+    "Não-HDL colesterol": "não-HDL",
     "TGO": "TGO",
     "AST": "TGO",
     "TGP": "TGP",
@@ -37,29 +36,18 @@ abreviacoes = {
     "Proteína C reativa": "PCR",
     "Ferro": "Ferro",
     "Saturação da transferrina": "Sat Transferrina",
-    "Homocisteína": "Homocist",
     "TSH": "TSH",
     "T4 livre": "T4L",
     "Tiroxina livre": "T4L",
     "T3": "T3",
-    "Triiodotironina": "T3",
-    "25 hidroxi-vitamina D": "Vit D",
-    "25-hidroxivitamina D": "Vit D",
-    "1,25 dihidroxivitamina D": "1,25 Vit D",
     "Vitamina D": "Vit D",
+    "25-hidroxivitamina D": "Vit D",
     "Vitamina B12": "Vit B12",
-    "Glicose": "Gj",
-    "Glicemia de jejum": "Gj",
-    "Hemoglobina glicada": "HbA1c",
-    "Colesterol total": "CT",
-    "HDL colesterol": "HDL",
-    "LDL colesterol": "LDL",
-    "VLDL colesterol": "VLDL",
-    "Não-HDL colesterol": "não-HDL",
-    "Triglicerídeos": "Tg",
-    "Triglicérides": "Tg",
     "HCG": "HCG",
 }
+
+# Exames do hemograma que queremos manter
+exames_hemograma = {"Hb", "Leuco", "Plaq"}
 
 def extrair_texto(pdf_file):
     texto = ""
@@ -83,14 +71,15 @@ def encontrar_exames(texto):
     for idx, linha in enumerate(linhas):
         for nome, abrev in abreviacoes.items():
             if re.search(rf"\b{nome}\b", linha, re.IGNORECASE):
-                # Tenta encontrar valor na mesma linha
+                # Procurar o valor no mesmo lugar ou na linha de baixo
                 match = re.search(r'([-+]?\d+[\d\.,]*)', linha)
-                # Se não encontrar, tenta buscar na próxima linha
                 if not match and idx + 1 < len(linhas):
                     match = re.search(r'([-+]?\d+[\d\.,]*)', linhas[idx + 1])
                 if match:
                     valor = match.group(1).replace(",", ".")
-                    resultados[abrev] = valor
+                    # Somente pega Hb, Leuco, Plaq se for Hemograma
+                    if abrev in exames_hemograma or abrev not in {"Hb", "Ht", "Eri", "Neutro", "Eos", "Baso", "Linf", "Mono", "RDW", "VCM", "HCM", "CHCM"}:
+                        resultados[abrev] = valor
     return resultados
 
 def encontrar_lab_data(texto):
@@ -124,11 +113,13 @@ if uploaded_file:
     if exames:
         partes = []
         grupo = []
-        for exame, valor in exames.items():
-            grupo.append(f"{exame} {valor}")
-            if exame in ["Plaq", "GGT", "Tg", "PCR", "Vit D", "Vit B12", "Ferritina", "Sat Transferrina"]:
-                partes.append(" ".join(grupo))
-                grupo = []
+        ordem = ["Hb", "Leuco", "Plaq", "Cr", "U", "Gj", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg", "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "TSH", "T4L", "T3", "PCR", "Ferro", "Sat Transferrina", "HCG"]
+        for exame in ordem:
+            if exame in exames:
+                grupo.append(f"{exame} {exames[exame]}")
+                if exame in ["Plaq", "Tg", "GGT", "Vit D", "Vit B12", "PCR", "Sat Transferrina"]:
+                    partes.append(" ".join(grupo))
+                    grupo = []
         if grupo:
             partes.append(" ".join(grupo))
 
