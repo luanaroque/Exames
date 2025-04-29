@@ -3,7 +3,7 @@ import fitz  # PyMuPDF
 import re
 import streamlit.components.v1 as components
 
-# Estilo da página
+# Estilo
 st.set_page_config(page_title="Transcritor de Exames", layout="wide")
 st.markdown("""
     <style>
@@ -30,6 +30,7 @@ abreviacoes = {
     "HDL colesterol": "HDL",
     "LDL colesterol": "LDL",
     "VLDL": "VLDL",
+    "Colesterol não-HDL": "não-HDL",
     "Triglicerídeos": "Tg",
     "Sódio": "Na",
     "Potássio": "K",
@@ -40,6 +41,8 @@ abreviacoes = {
     "Bilirrubina indireta": "BI",
     "Fosfatase alcalina": "FAL",
     "Gama GT": "GGT",
+    "TSH": "TSH",
+    "T4 livre": "T4l",
     "Vitamina D": "Vit D",
     "Vitamina B12": "Vit B12",
     "PCR": "PCR",
@@ -55,9 +58,10 @@ abreviacoes = {
     "Anti-HCV": "Anti-HCV",
     "Sífilis": "Sífilis",
     "Hormônio Anti-Mulleriano": "AMH",
+    "TGO": "TGO",
+    "TGP": "TGP"
 }
 
-# Funções
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -66,33 +70,29 @@ def extrair_texto(pdf_file):
     return texto
 
 def limpar_texto(texto):
-    texto = re.sub(r'(\n)+', '\n', texto)
-    texto = re.sub(r'CRM.*', '', texto)
-    texto = re.sub(r'ANVISA.*', '', texto)
-    texto = re.sub(r'Tel.*', '', texto)
-    texto = re.sub(r'Página.*', '', texto)
+    texto = re.sub(r'\n+', '\n', texto)
+    texto = re.sub(r'CRM.*|ANVISA.*|Tel.*|Página.*', '', texto)
     return texto
 
-def encontrar_valor(trecho):
-    if re.search(r"(não reagente|indetectável|não detectado)", trecho, re.IGNORECASE):
-        return "NR"
-    numeros = re.findall(r'[-+]?\d[\d,.]*', trecho)
-    if numeros:
-        valor = numeros[0].replace(",", ".")
-        return valor
+def encontrar_valor_bloco(texto, nome_exame):
+    padrao = rf"{nome_exame}.*?Resultado.*?([^\n]+)"
+    resultado = re.search(padrao, texto, re.IGNORECASE | re.DOTALL)
+    if resultado:
+        linha = resultado.group(1)
+        if re.search(r"não reagente|indetectável|não detectado", linha, re.IGNORECASE):
+            return "NR"
+        numeros = re.findall(r"[-+]?\d[\d.,]*", linha)
+        if numeros:
+            return numeros[0].replace(",", ".")
     return None
 
 def encontrar_exames(texto):
     resultados = {}
-    texto_normalizado = texto.replace('\n', ' ')
+    texto = texto.replace("\n", " ")
     for nome, abrev in abreviacoes.items():
-        if nome.lower() in texto_normalizado.lower():
-            padrao = rf"{nome}.*?(não reagente|indetectável|não detectado|[-+]?\d[\d,.]*)"
-            busca = re.search(padrao, texto_normalizado, re.IGNORECASE)
-            if busca:
-                resultado = encontrar_valor(busca.group())
-                if resultado:
-                    resultados[abrev] = resultado
+        valor = encontrar_valor_bloco(texto, nome)
+        if valor:
+            resultados[abrev] = valor
     return resultados
 
 def encontrar_lab_data(texto):
@@ -107,7 +107,7 @@ def encontrar_lab_data(texto):
         data = datas[0]
     return lab, data
 
-# Aplicativo
+# Upload e processamento
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -123,43 +123,35 @@ if uploaded_file:
         data_exame = st.text_input("Data da coleta", data)
 
     if exames:
-        ordem = [
-            "Hb", "Ht", "Leuco", "Plaq", "Cr", "U", "Gj", "HbA1c", "CT", "HDL", "LDL", "não-HDL", "VLDL", "Tg",
-            "TGO", "TGP", "FAL", "GGT", "Vit D", "Vit B12", "PCR", "Ferritina", "Sat Transferrina",
-            "FSH", "LH", "E2", "Prog", "Testo", "HCG", "HIV", "Anti-HCV", "Sífilis", "AMH"
-        ]
-        resumo_exames = []
-        for exame in ordem:
-            if exame in exames:
-                resumo_exames.append(f"{exame} {exames[exame]}")
+        ordem = list(abreviacoes.values())
+        resumo_exames = [f"{exame} {exames[exame]}" for exame in ordem if exame in exames]
 
         resumo_final = ""
         if laboratorio:
-            resumo_final += f"{laboratorio}"
+            resumo_final += laboratorio
         if data_exame:
             resumo_final += f", {data_exame}"
         if resumo_exames:
             resumo_final += ": " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
-        resumo = st.text_area("Resumo:", resumo_final, height=300, key="resumo_texto")
+        st.text_area("Resumo:", resumo_final, height=300, key="resumo_texto")
 
-        # Botão copiar com componente
-        copy_code = f"""
+        # Copiar usando JavaScript
+        copy_html = f"""
         <script>
         function copyToClipboard(text) {{
-          navigator.clipboard.writeText(text).then(function() {{
-            alert('Resumo copiado com sucesso!');
-          }}, function(err) {{
-            alert('Erro ao copiar o resumo');
-          }});
+            navigator.clipboard.writeText(text).then(function() {{
+                alert("Resumo copiado com sucesso!");
+            }});
         }}
         </script>
-        <button onclick="copyToClipboard(`{resumo_final}`)" style="background-color:#4d79ff;color:white;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;font-size:16px;cursor:pointer;">
-            Copiar resumo
+        <button onclick="copyToClipboard(`{resumo_final}`)"
+        style="background-color:#4d79ff;color:white;padding:10px 20px;border:none;border-radius:8px;font-weight:bold;font-size:16px;cursor:pointer;">
+        Copiar resumo
         </button>
         """
-        components.html(copy_code, height=100)
+        components.html(copy_html, height=100)
 
     else:
-        st.warning("Nenhum exame encontrado no documento.")
+        st.warning("Nenhum exame encontrado.")
