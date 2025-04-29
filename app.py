@@ -16,7 +16,6 @@ st.markdown("""
 
 st.title("Transcritor de Exames")
 
-# Abreviações
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Hematócrito": "Ht",
@@ -62,7 +61,6 @@ abreviacoes = {
     "TGP": "TGP"
 }
 
-# Funções
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -82,42 +80,26 @@ def encontrar_exames_com_referencia(texto):
         linha = linhas[i].strip()
         for nome, abrev in abreviacoes.items():
             if nome.lower() in linha.lower():
-                # Buscar valor na linha "Resultado" que aparece logo após
-                for j in range(i, min(i + 5, len(linhas))):
-                    if "resultado" in linhas[j].lower():
-                        valor_linha = linhas[j + 1] if j + 1 < len(linhas) else linhas[j]
-                        break
-                else:
-                    continue
+                # Valor provável na linha atual ou nas 2 seguintes
+                bloco = " ".join(linhas[i:i+3])
+                valor_match = re.search(r"[><]?\s*\d[\d,\.]*", bloco)
+                referencia_match = re.findall(r"\d[\d,\.]*\s*[-–]\s*\d[\d,\.]*", bloco)
 
-                # Buscar faixa de referência nas próximas linhas
-                referencia = ""
-                for k in range(i, min(i + 10, len(linhas))):
-                    if re.search(r"\d", linhas[k]) and "-" in linhas[k]:
-                        referencia = linhas[k]
-                        break
-
-                # Pega o valor numérico (mesmo com > ou <)
-                match_valor = re.search(r"[><]?\s*\d[\d,\.]*", valor_linha)
-                if match_valor:
-                    valor_bruto = match_valor.group().replace(",", ".").replace(" ", "")
-                    valor_formatado = valor_bruto
+                if valor_match:
+                    bruto = valor_match.group().replace(",", ".").replace(" ", "")
                     try:
-                        valor_num = float(re.sub(r"[><]", "", valor_bruto))
-                        # Comparar com faixa de referência
-                        ref_nums = re.findall(r"\d[\d,\.]*", referencia)
-                        if len(ref_nums) >= 2:
-                            ref_min = float(ref_nums[0].replace(",", "."))
-                            ref_max = float(ref_nums[1].replace(",", "."))
-                            if valor_num < ref_min or valor_num > ref_max:
-                                valor_formatado = f"**{valor_num}***"
-                            else:
-                                valor_formatado = f"{valor_num}"
-                        else:
-                            valor_formatado = f"{valor_num}"
+                        valor = float(re.sub(r"[><]", "", bruto))
+                        alterado = False
+                        if referencia_match:
+                            faixa = referencia_match[0]
+                            lim = re.findall(r"\d[\d,\.]*", faixa)
+                            if len(lim) == 2:
+                                minimo = float(lim[0])
+                                maximo = float(lim[1])
+                                alterado = valor < minimo or valor > maximo
+                        resultados[abrev] = f"**{valor}***" if alterado else f"{valor}"
                     except:
-                        pass
-                    resultados[abrev] = valor_formatado
+                        continue
     return resultados
 
 def encontrar_lab_data(texto):
@@ -160,8 +142,14 @@ if uploaded_file:
             resumo_final += ": " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
-        st.markdown(f"""<div style='background-color:#fff;padding:10px;border-radius:5px'>
-        <strong>{resumo_final}</strong></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div style="background-color:#ffffff; color:#000000;
+                        padding:15px; border-radius:8px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        font-size: 16px;">
+                <strong>{resumo_final}</strong>
+            </div>
+        """, unsafe_allow_html=True)
 
         # Botão copiar
         copy_html = f"""
