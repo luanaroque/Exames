@@ -16,7 +16,6 @@ st.markdown("""
 
 st.title("Transcritor de Exames")
 
-# Abreviações
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Hematócrito": "Ht",
@@ -58,6 +57,8 @@ abreviacoes = {
     "Anti-HCV": "Anti-HCV",
     "Sífilis": "Sífilis",
     "Hormônio Anti-Mulleriano": "AMH",
+    "Aspartato Aminotransferase": "TGO",
+    "Alanina Aminotransferase": "TGP",
     "TGO": "TGO",
     "TGP": "TGP"
 }
@@ -107,7 +108,7 @@ def encontrar_lab_data(texto):
         data = datas[0]
     return lab, data
 
-# Upload e processamento
+# App
 uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 
 if uploaded_file:
@@ -123,7 +124,7 @@ if uploaded_file:
         data_exame = st.text_input("Data da coleta", data)
 
     if exames:
-        ordem = list(abreviacoes.values())
+        ordem = list(dict.fromkeys(abreviacoes.values()))
         resumo_exames = [f"{exame} {exames[exame]}" for exame in ordem if exame in exames]
 
         resumo_final = ""
@@ -137,7 +138,7 @@ if uploaded_file:
         st.subheader("Resumo gerado")
         st.text_area("Resumo:", resumo_final, height=300, key="resumo_texto")
 
-        # Copiar usando JavaScript
+        # Botão copiar
         copy_html = f"""
         <script>
         function copyToClipboard(text) {{
@@ -154,4 +155,4 @@ if uploaded_file:
         components.html(copy_html, height=100)
 
     else:
-        st.warning("Nenhum exame encontrado.")
+        st.warning("Nenhum exame encontrado no documento.")
