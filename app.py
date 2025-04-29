@@ -16,6 +16,7 @@ st.markdown("""
 
 st.title("Transcritor de Exames")
 
+# Abreviações
 abreviacoes = {
     "Hemoglobina": "Hb",
     "Hematócrito": "Ht",
@@ -57,12 +58,11 @@ abreviacoes = {
     "Anti-HCV": "Anti-HCV",
     "Sífilis": "Sífilis",
     "Hormônio Anti-Mulleriano": "AMH",
-    "Aspartato Aminotransferase": "TGO",
-    "Alanina Aminotransferase": "TGP",
     "TGO": "TGO",
     "TGP": "TGP"
 }
 
+# Funções
 def extrair_texto(pdf_file):
     texto = ""
     with fitz.open(stream=pdf_file.read(), filetype="pdf") as doc:
@@ -75,32 +75,56 @@ def limpar_texto(texto):
     texto = re.sub(r'CRM.*|ANVISA.*|Tel.*|Página.*', '', texto)
     return texto
 
-def encontrar_valor_bloco(texto, nome_exame):
-    padrao = rf"{nome_exame}.*?Resultado.*?([^\n]+)"
-    resultado = re.search(padrao, texto, re.IGNORECASE | re.DOTALL)
-    if resultado:
-        linha = resultado.group(1)
-        if re.search(r"não reagente|indetectável|não detectado", linha, re.IGNORECASE):
-            return "NR"
-        numeros = re.findall(r"[-+]?\d[\d.,]*", linha)
-        if numeros:
-            return numeros[0].replace(",", ".")
-    return None
-
-def encontrar_exames(texto):
+def encontrar_exames_com_referencia(texto):
     resultados = {}
-    texto = texto.replace("\n", " ")
-    for nome, abrev in abreviacoes.items():
-        valor = encontrar_valor_bloco(texto, nome)
-        if valor:
-            resultados[abrev] = valor
+    linhas = texto.split('\n')
+    for i in range(len(linhas)):
+        linha = linhas[i].strip()
+        for nome, abrev in abreviacoes.items():
+            if nome.lower() in linha.lower():
+                # Buscar valor na linha "Resultado" que aparece logo após
+                for j in range(i, min(i + 5, len(linhas))):
+                    if "resultado" in linhas[j].lower():
+                        valor_linha = linhas[j + 1] if j + 1 < len(linhas) else linhas[j]
+                        break
+                else:
+                    continue
+
+                # Buscar faixa de referência nas próximas linhas
+                referencia = ""
+                for k in range(i, min(i + 10, len(linhas))):
+                    if re.search(r"\d", linhas[k]) and "-" in linhas[k]:
+                        referencia = linhas[k]
+                        break
+
+                # Pega o valor numérico (mesmo com > ou <)
+                match_valor = re.search(r"[><]?\s*\d[\d,\.]*", valor_linha)
+                if match_valor:
+                    valor_bruto = match_valor.group().replace(",", ".").replace(" ", "")
+                    valor_formatado = valor_bruto
+                    try:
+                        valor_num = float(re.sub(r"[><]", "", valor_bruto))
+                        # Comparar com faixa de referência
+                        ref_nums = re.findall(r"\d[\d,\.]*", referencia)
+                        if len(ref_nums) >= 2:
+                            ref_min = float(ref_nums[0].replace(",", "."))
+                            ref_max = float(ref_nums[1].replace(",", "."))
+                            if valor_num < ref_min or valor_num > ref_max:
+                                valor_formatado = f"**{valor_num}***"
+                            else:
+                                valor_formatado = f"{valor_num}"
+                        else:
+                            valor_formatado = f"{valor_num}"
+                    except:
+                        pass
+                    resultados[abrev] = valor_formatado
     return resultados
 
 def encontrar_lab_data(texto):
     lab = ""
     data = ""
     if "Albert Einstein" in texto:
-        lab = "Albert Einstein"
+        lab = "Einstein"
     elif "Fleury" in texto or "Edgar Rizzatti" in texto:
         lab = "Fleury"
     datas = re.findall(r'\d{2}/\d{2}/\d{4}', texto)
@@ -114,7 +138,7 @@ uploaded_file = st.file_uploader("Envie o PDF de exames", type=["pdf"])
 if uploaded_file:
     texto = extrair_texto(uploaded_file)
     texto = limpar_texto(texto)
-    exames = encontrar_exames(texto)
+    exames = encontrar_exames_com_referencia(texto)
     lab, data = encontrar_lab_data(texto)
 
     col1, col2 = st.columns(2)
@@ -136,7 +160,8 @@ if uploaded_file:
             resumo_final += ": " + " | ".join(resumo_exames)
 
         st.subheader("Resumo gerado")
-        st.text_area("Resumo:", resumo_final, height=300, key="resumo_texto")
+        st.markdown(f"""<div style='background-color:#fff;padding:10px;border-radius:5px'>
+        <strong>{resumo_final}</strong></div>""", unsafe_allow_html=True)
 
         # Botão copiar
         copy_html = f"""
@@ -155,4 +180,4 @@ if uploaded_file:
         components.html(copy_html, height=100)
 
     else:
-        st.warning("Nenhum exame encontrado no documento.")
+        st.warning("Nenhum exame encontrado.")
